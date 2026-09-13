@@ -1,0 +1,4936 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Go 黑马点评 API",
+    "version": "1.0.0",
+    "description": "保留Java业务Result格式。教学写接口需登录但没有商家RBAC；公开部署前应补角色权限。金额为分；ID为int64，秒杀响应X-Order-ID为精确字符串。"
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8081"
+    },
+    {
+      "url": "http://localhost:8080/api"
+    }
+  ],
+  "paths": {
+    "/user/code": {
+      "post": {
+        "summary": "发送验证码",
+        "operationId": "post__user_code",
+        "tags": [
+          "user"
+        ],
+        "security": [],
+        "description": "开发短信写API日志，不在响应中泄露。关闭dev_code_log时明确返回503，需接短信商。\nRedis: String login:code:手机号 2m；login:throttle:手机号 60s\nMySQL: 无",
+        "parameters": [
+          {
+            "name": "phone",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "11位中国大陆手机号",
+            "example": "13900000001"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "业务结果；检查success字段",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "required": [
+                        "success"
+                      ],
+                      "properties": {
+                        "success": {
+                          "type": "boolean",
+                          "enum": [
+                            true
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "$ref": "#/components/schemas/Error"
+                    }
+                  ]
+                },
+                "examples": {
+                  "success": {
+                    "value": {
+                      "success": true
+                    }
+                  },
+                  "failure": {
+                    "value": {
+                      "success": false,
+                      "errorMsg": "验证码发送频繁，请稍后重试"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "缺少或失效Token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "系统故障",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖或短信服务不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/user/login": {
+      "post": {
+        "summary": "验证码/密码登录",
+        "operationId": "post__user_login",
+        "tags": [
+          "user"
+        ],
+        "security": [],
+        "description": "裸Token返回data；password分支只验证bcrypt，不接受原未启用的MD5工具。\nRedis: 消费验证码；限制5次尝试；写login:token:Token Hash，TTL30m\nMySQL: 按唯一手机号查询；首次验证码登录创建tb_user",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "业务结果；检查success字段",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "required": [
+                        "success"
+                      ],
+                      "properties": {
+                        "success": {
+                          "type": "boolean",
+                          "enum": [
+                            true
+                          ]
+                        },
+                        "data": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    {
+                      "$ref": "#/components/schemas/Error"
+                    }
+                  ]
+                },
+                "examples": {
+                  "success": {
+                    "value": {
+                      "success": true,
+                      "data": "64位随机十六进制Token"
+                    }
+                  },
+                  "failure": {
+                    "value": {
+                      "success": false,
+                      "errorMsg": "验证码无效或尝试次数过多"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "缺少或失效Token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "系统故障",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖或短信服务不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginInput"
+              },
+              "example": {
+                "phone": "13900000001",
+                "code": "从日志或Redis读取"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/user/logout": {
+      "post": {
+        "summary": "注销当前会话",
+        "operationId": "post__user_logout",
+        "tags": [
+          "user"
+        ],
+        "security": [
+          {
+            "token": []
+          }
+        ],
+        "description": "修复Java仅清ThreadLocal却未删除登录态的问题。\nRedis: DEL当前Token Hash\nMySQL: 无",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "业务结果；检查success字段",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "required": [
+                        "success"
+                      ],
+                      "properties": {
+                        "success": {
+                          "type": "boolean",
+                          "enum": [
+                            true
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "$ref": "#/components/schemas/Error"
+                    }
+                  ]
+                },
+                "examples": {
+                  "success": {
+                    "value": {
+                      "success": true
+                    }
+                  },
+                  "failure": {
+                    "value": {
+                      "success": false,
+                      "errorMsg": "请求参数无效"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "缺少或失效Token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "系统故障",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖或短信服务不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/user/refresh": {
+      "post": {
+        "summary": "主动续期",
+        "operationId": "post__user_refresh",
+        "tags": [
+          "user"
+        ],
+        "security": [
+          {
+            "token": []
+          }
+        ],
+        "description": "新增；平常任意携带有效Token的请求也自动滑动续期。\nRedis: 中间件把当前Token TTL刷新至30m\nMySQL: 无",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "业务结果；检查success字段",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "required": [
+                        "success"
+                      ],
+                      "properties": {
+                        "success": {
+                          "type": "boolean",
+                          "enum": [
+                            true
+                          ]
+                        },
+                        "data": {
+                          "type": "object",
+                          "properties": {
+                            "ttlSeconds": {
+                              "type": "integer",
+                              "format": "int64"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "$ref": "#/components/schemas/Error"
+                    }
+                  ]
+                },
+                "examples": {
+                  "success": {
+                    "value": {
+                      "success": true,
+                      "data": {
+                        "ttlSeconds": 1800
+                      }
+                    }
+                  },
+                  "failure": {
+                    "value": {
+                      "success": false,
+                      "errorMsg": "请求参数无效"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "缺少或失效Token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "系统故障",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖或短信服务不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/user/me": {
+      "get": {
+        "summary": "当前用户",
+        "operationId": "get__user_me",
+        "tags": [
+          "user"
+        ],
+        "security": [
+          {
+            "token": []
+          }
+        ],
+        "description": "\nRedis: 读取并刷新当前Token Hash\nMySQL: 无",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "业务结果；检查success字段",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "required": [
+                        "success"
+                      ],
+                      "properties": {
+                        "success": {
+                          "type": "boolean",
+                          "enum": [
+                            true
+                          ]
+                        },
+                        "data": {
+                          "$ref": "#/components/schemas/UserDTO"
+                        }
+                      }
+                    },
+                    {
+                      "$ref": "#/components/schemas/Error"
+                    }
+                  ]
+                },
+                "examples": {
+                  "success": {
+                    "value": {
+                      "success": true,
+                      "data": {
+                        "id": 1,
+                        "nickName": "学习用户一",
+                        "icon": ""
+                      }
+                    }
+                  },
+                  "failure": {
+                    "value": {
+                      "success": false,
+                      "errorMsg": "请求参数无效"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "缺少或失效Token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "系统故障",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖或短信服务不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/user/{id}": {
+      "get": {
+        "summary": "查询用户公开信息",
+        "operationId": "get__user__id_",
+        "tags": [
+          "user"
+        ],
+        "security": [
+          {
+            "token": []
+          }
+        ],
+        "description": "不存在返回success:true无data，不返回phone/password。\nRedis: 仅会话续期\nMySQL: SELECT tb_user",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            },
+            "description": "目标资源ID，正整数",
+            "example": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "业务结果；检查success字段",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "required": [
+                        "success"
+                      ],
+                      "properties": {
+                        "success": {
+                          "type": "boolean",
+                          "enum": [
+                            true
+                          ]
+                        },
+                        "data": {
+                          "$ref": "#/components/schemas/UserDTO"
+                        }
+                      }
+                    },
+                    {
+                      "$ref": "#/components/schemas/Error"
+                    }
+                  ]
+                },
+                "examples": {
+                  "success": {
+                    "value": {
+                      "success": true,
+                      "data": {
+                        "id": 1,
+                        "nickName": "学习用户一",
+                        "icon": ""
+                      }
+                    }
+                  },
+                  "failure": {
+                    "value": {
+                      "success": false,
+                      "errorMsg": "请求参数无效"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "缺少或失效Token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "系统故障",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖或短信服务不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/user/info/{id}": {
+      "get": {
+        "summary": "用户资料",
+        "operationId": "get__user_info__id_",
+        "tags": [
+          "user"
+        ],
+        "security": [
+          {
+            "token": []
+          }
+        ],
+        "description": "无资料时无data；不返回创建/更新时间。\nRedis: 仅会话续期\nMySQL: SELECT tb_user_info",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            },
+            "description": "目标资源ID，正整数",
+            "example": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "业务结果；检查success字段",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "required": [
+                        "success"
+                      ],
+                      "properties": {
+                        "success": {
+                          "type": "boolean",
+                          "enum": [
+                            true
+                          ]
+                        },
+                        "data": {
+                          "$ref": "#/components/schemas/UserInfo"
+                        }
+                      }
+                    },
+                    {
+                      "$ref": "#/components/schemas/Error"
+                    }
+                  ]
+                },
+                "examples": {
+                  "success": {
+                    "value": {
+                      "success": true,
+                      "data": {
+                        "userId": 1,
+                        "city": "杭州",
+                        "gender": 0,
+                        "level": 0
+                      }
+                    }
+                  },
+                  "failure": {
+                    "value": {
+                      "success": false,
+                      "errorMsg": "请求参数无效"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "缺少或失效Token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "系统故障",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖或短信服务不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/user/password": {
+      "put": {
+        "summary": "设置当前用户密码",
+        "operationId": "put__user_password",
+        "tags": [
+          "user"
+        ],
+        "security": [
+          {
+            "token": []
+          }
+        ],
+        "description": "新增学习接口；当前有效登录态作为授权。\nRedis: 仅会话续期\nMySQL: UPDATE tb_user.password 为bcrypt哈希",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "业务结果；检查success字段",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "required": [
+                        "success"
+                      ],
+                      "properties": {
+                        "success": {
+                          "type": "boolean",
+                          "enum": [
+                            true
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "$ref": "#/components/schemas/Error"
+                    }
+                  ]
+                },
+                "examples": {
+                  "success": {
+                    "value": {
+                      "success": true
+                    }
+                  },
+                  "failure": {
+                    "value": {
+                      "success": false,
+                      "errorMsg": "请求参数无效"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "缺少或失效Token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "系统故障",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖或短信服务不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordInput"
+              },
+              "example": {
+                "password": "learning-go-2026"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/user/sign": {
+      "post": {
+        "summary": "今日签到",
+        "operationId": "post__user_sign",
+        "tags": [
+          "user"
+        ],
+        "security": [
+          {
+            "token": []
+          }
+        ],
+        "description": "按Asia/Shanghai自然日；重复签到幂等，不写tb_sign。\nRedis: SETBIT sign:用户ID:yyyyMM，当月第day-1位\nMySQL: 无",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "业务结果；检查success字段",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "required": [
+                        "success"
+                      ],
+                      "properties": {
+                        "success": {
+                          "type": "boolean",
+                          "enum": [
+                            true
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "$ref": "#/components/schemas/Error"
+                    }
+                  ]
+                },
+                "examples": {
+                  "success": {
+                    "value": {
+                      "success": true
+                    }
+                  },
+                  "failure": {
+                    "value": {
+                      "success": false,
+                      "errorMsg": "请求参数无效"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "缺少或失效Token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "系统故障",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖或短信服务不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/user/sign/count": {
+      "get": {
+        "summary": "连续签到天数",
+        "operationId": "get__user_sign_count",
+        "tags": [
+          "user"
+        ],
+        "security": [
+          {
+            "token": []
+          }
+        ],
+        "description": "从今天向前数末尾连续1，今天未签到返回0，不跨月。\nRedis: BITFIELD sign:用户ID:yyyyMM GET u日数 0\nMySQL: 无",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "业务结果；检查success字段",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "required": [
+                        "success"
+                      ],
+                      "properties": {
+                        "success": {
+                          "type": "boolean",
+                          "enum": [
+                            true
+                          ]
+                        },
+                        "data": {
+                          "type": "integer",
+                          "format": "int64"
+                        }
+                      }
+                    },
+                    {
+                      "$ref": "#/components/schemas/Error"
+                    }
+                  ]
+                },
+                "examples": {
+                  "success": {
+                    "value": {
+                      "success": true,
+                      "data": 3
+                    }
+                  },
+                  "failure": {
+                    "value": {
+                      "success": false,
+                      "errorMsg": "请求参数无效"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "缺少或失效Token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "系统故障",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖或短信服务不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/shop/{id}": {
+      "get": {
+        "summary": "商铺详情",
+        "operationId": "get__shop__id_",
+        "tags": [
+          "shop"
+        ],
+        "security": [],
+        "description": "冷缓存自动回源；singleflight+锁合并；更新版本防止旧数据回填。\nRedis: Cache Aside cache:shop:ID；空值2m，正常30–33m逻辑TTL+5m过期缓冲\nMySQL: 未命中查询tb_shop",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            },
+            "description": "目标资源ID，正整数",
+            "example": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "业务结果；检查success字段",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "required": [
+                        "success"
+                      ],
+                      "properties": {
+                        "success": {
+                          "type": "boolean",
+                          "enum": [
+                            true
+                          ]
+                        },
+                        "data": {
+                          "$ref": "#/components/schemas/Shop"
+                        }
+                      }
+                    },
+                    {
+                      "$ref": "#/components/schemas/Error"
+                    }
+                  ]
+                },
+                "examples": {
+                  "success": {
+                    "value": {
+                      "success": true,
+                      "data": {
+                        "id": 1,
+                        "name": "示例商铺",
+                        "typeId": 1,
+                        "address": "示例地址",
+                        "x": 120.149192,
+                        "y": 30.316078,
+                        "score": 45
+                      }
+                    }
+                  },
+                  "failure": {
+                    "value": {
+                      "success": false,
+                      "errorMsg": "资源不存在"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "缺少或失效Token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "系统故障",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖或短信服务不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/shop": {
+      "post": {
+        "summary": "创建商铺",
+        "operationId": "post__shop",
+        "tags": [
+          "shop"
+        ],
+        "security": [
+          {
+            "token": []
+          }
+        ],
+        "description": "原匿名写接口改为须登录。\nRedis: 维护shop:geo:类型ID；失效对应缓存\nMySQL: INSERT tb_shop，校验tb_shop_type",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "业务结果；检查success字段",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "required": [
+                        "success"
+                      ],
+                      "properties": {
+                        "success": {
+                          "type": "boolean",
+                          "enum": [
+                            true
+                          ]
+                        },
+                        "data": {
+                          "type": "integer",
+                          "format": "int64"
+                        }
+                      }
+                    },
+                    {
+                      "$ref": "#/components/schemas/Error"
+                    }
+                  ]
+                },
+                "examples": {
+                  "success": {
+                    "value": {
+                      "success": true,
+                      "data": 15
+                    }
+                  },
+                  "failure": {
+                    "value": {
+                      "success": false,
+                      "errorMsg": "请求参数无效"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "缺少或失效Token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "系统故障",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖或短信服务不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ShopInput"
+              },
+              "example": {
+                "name": "新商铺",
+                "typeId": 1,
+                "address": "示例路1号",
+                "x": 120.15,
+                "y": 30.31
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "更新商铺",
+        "operationId": "put__shop",
+        "tags": [
+          "shop"
+        ],
+        "security": [
+          {
+            "token": []
+          }
+        ],
+        "description": "原匿名写接口改为须登录。支持score:0；缓存删除失败会返回503并提示DB已更新，可重试相同更新。\nRedis: 提交后删除缓存并递增版本；维护GEO\nMySQL: UPDATE tb_shop 白名单字段",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "业务结果；检查success字段",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "required": [
+                        "success"
+                      ],
+                      "properties": {
+                        "success": {
+                          "type": "boolean",
+                          "enum": [
+                            true
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "$ref": "#/components/schemas/Error"
+                    }
+                  ]
+                },
+                "examples": {
+                  "success": {
+                    "value": {
+                      "success": true
+                    }
+                  },
+                  "failure": {
+                    "value": {
+                      "success": false,
+                      "errorMsg": "请求参数无效"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "缺少或失效Token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "系统故障",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖或短信服务不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ShopInput"
+              },
+              "example": {
+                "id": 1,
+                "name": "新名称",
+                "score": 0
+              }
+            }
+          }
+        }
+      }
+    },
+    "/shop/of/type": {
+      "get": {
+        "summary": "类型/附近商铺",
+        "operationId": "get__shop_of_type",
+        "tags": [
+          "shop"
+        ],
+        "security": [],
+        "description": "每页5条；必须同时提供x/y，不提供走普通分类查询。\nRedis: 提供x/y时GEOSEARCH，5000米、ASC距离排序；必要时重建索引\nMySQL: 类型过滤或按GEO返回ID回查tb_shop",
+        "parameters": [
+          {
+            "name": "typeId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "商铺类型正整数",
+            "example": 1
+          },
+          {
+            "name": "current",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "页码；默认1。商铺上限1000，Blog上限100000。",
+            "example": 1
+          },
+          {
+            "name": "x",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number"
+            },
+            "description": "经度-180..180",
+            "example": 120.149192
+          },
+          {
+            "name": "y",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number"
+            },
+            "description": "纬度-85.05112878..85.05112878",
+            "example": 30.316078
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "业务结果；检查success字段",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "required": [
+                        "success"
+                      ],
+                      "properties": {
+                        "success": {
+                          "type": "boolean",
+                          "enum": [
+                            true
+                          ]
+                        },
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/Shop"
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "$ref": "#/components/schemas/Error"
+                    }
+                  ]
+                },
+                "examples": {
+                  "success": {
+                    "value": {
+                      "success": true,
+                      "data": [
+                        {
+                          "id": 1,
+                          "name": "示例商铺",
+                          "typeId": 1,
+                          "address": "示例地址",
+                          "x": 120.149192,
+                          "y": 30.316078,
+                          "score": 45,
+                          "distance": 120.5
+                        }
+                      ]
+                    }
+                  },
+                  "failure": {
+                    "value": {
+                      "success": false,
+                      "errorMsg": "请求参数无效"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "缺少或失效Token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "系统故障",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖或短信服务不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/shop/of/name": {
+      "get": {
+        "summary": "名称搜索商铺",
+        "operationId": "get__shop_of_name",
+        "tags": [
+          "shop"
+        ],
+        "security": [],
+        "description": "无name时按ID分页全部商铺。\nRedis: 无（有效Token仍续期）\nMySQL: tb_shop.name LIKE，分页10条",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "名称关键词",
+            "example": "美食"
+          },
+          {
+            "name": "current",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "页码；默认1。商铺上限1000，Blog上限100000。",
+            "example": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "业务结果；检查success字段",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "required": [
+                        "success"
+                      ],
+                      "properties": {
+                        "success": {
+                          "type": "boolean",
+                          "enum": [
+                            true
+                          ]
+                        },
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/Shop"
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "$ref": "#/components/schemas/Error"
+                    }
+                  ]
+                },
+                "examples": {
+                  "success": {
+                    "value": {
+                      "success": true,
+                      "data": [
+                        {
+                          "id": 1,
+                          "name": "示例商铺",
+                          "typeId": 1,
+                          "address": "示例地址",
+                          "x": 120.149192,
+                          "y": 30.316078,
+                          "score": 45
+                        }
+                      ]
+                    }
+                  },
+                  "failure": {
+                    "value": {
+                      "success": false,
+                      "errorMsg": "请求参数无效"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "缺少或失效Token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "系统故障",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖或短信服务不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/shop-type/list": {
+      "get": {
+        "summary": "商铺类型列表",
+        "operationId": "get__shop_type_list",
+        "tags": [
+          "shop-type"
+        ],
+        "security": [],
+        "description": "替代原无TTL且可能重复的List，接口数组不变。\nRedis: shop_type: 缓存包裹JSON String，30–33m+5m\nMySQL: 未命中tb_shop_type ORDER BY sort,id",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "业务结果；检查success字段",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "required": [
+                        "success"
+                      ],
+                      "properties": {
+                        "success": {
+                          "type": "boolean",
+                          "enum": [
+                            true
+                          ]
+                        },
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/ShopType"
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "$ref": "#/components/schemas/Error"
+                    }
+                  ]
+                },
+                "examples": {
+                  "success": {
+                    "value": {
+                      "success": true,
+                      "data": [
+                        {
+                          "id": 1,
+                          "name": "美食",
+                          "icon": "/types/ms.png",
+                          "sort": 1
+                        }
+                      ]
+                    }
+                  },
+                  "failure": {
+                    "value": {
+                      "success": false,
+                      "errorMsg": "请求参数无效"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "缺少或失效Token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "系统故障",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖或短信服务不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/blog/hot": {
+      "get": {
+        "summary": "热门笔记",
+        "operationId": "get__blog_hot",
+        "tags": [
+          "blog"
+        ],
+        "security": [],
+        "description": "每页10条。游客isLike=false。\nRedis: 仅可选Token续期\nMySQL: tb_blog按liked desc,id desc；批量查作者/点赞明细",
+        "parameters": [
+          {
+            "name": "current",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "页码；默认1。商铺上限1000，Blog上限100000。",
+            "example": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "业务结果；检查success字段",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "required": [
+                        "success"
+                      ],
+                      "properties": {
+                        "success": {
+                          "type": "boolean",
+                          "enum": [
+                            true
+                          ]
+                        },
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/Blog"
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "$ref": "#/components/schemas/Error"
+                    }
+                  ]
+                },
+                "examples": {
+                  "success": {
+                    "value": {
+                      "success": true,
+                      "data": [
+                        {
+                          "id": 1,
+                          "shopId": 1,
+                          "userId": 1,
+                          "title": "探店笔记",
+                          "images": "/imgs/demo.png",
+                          "content": "这是一篇学习笔记",
+                          "liked": 1,
+                          "name": "学习用户一",
+                          "icon": "",
+                          "isLike": true
+                        }
+                      ]
+                    }
+                  },
+                  "failure": {
+                    "value": {
+                      "success": false,
+                      "errorMsg": "请求参数无效"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "缺少或失效Token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "系统故障",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖或短信服务不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/blog/{id}": {
+      "get": {
+        "summary": "笔记详情",
+        "operationId": "get__blog__id_",
+        "tags": [
+          "blog"
+        ],
+        "security": [
+          {
+            "token": []
+          }
+        ],
+        "description": "原实现除hot外所有Blog查询均要求登录。\nRedis: 仅会话续期\nMySQL: tb_blog + tb_user + tb_blog_like",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            },
+            "description": "目标资源ID，正整数",
+            "example": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "业务结果；检查success字段",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "required": [
+                        "success"
+                      ],
+                      "properties": {
+                        "success": {
+                          "type": "boolean",
+                          "enum": [
+                            true
+                          ]
+                        },
+                        "data": {
+                          "$ref": "#/components/schemas/Blog"
+                        }
+                      }
+                    },
+                    {
+                      "$ref": "#/components/schemas/Error"
+                    }
+                  ]
+                },
+                "examples": {
+                  "success": {
+                    "value": {
+                      "success": true,
+                      "data": {
+                        "id": 1,
+                        "shopId": 1,
+                        "userId": 1,
+                        "title": "探店笔记",
+                        "images": "/imgs/demo.png",
+                        "content": "这是一篇学习笔记",
+                        "liked": 1,
+                        "name": "学习用户一",
+                        "icon": "",
+                        "isLike": true
+                      }
+                    }
+                  },
+                  "failure": {
+                    "value": {
+                      "success": false,
+                      "errorMsg": "请求参数无效"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "缺少或失效Token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "系统故障",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖或短信服务不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/blog": {
+      "post": {
+        "summary": "发布笔记",
+        "operationId": "post__blog",
+        "tags": [
+          "blog"
+        ],
+        "security": [
+          {
+            "token": []
+          }
+        ],
+        "description": "最多9张图片；作者强制当前用户。Redis失败后由outbox补投。\nRedis: 尝试将blogId以毫秒score写入粉丝feed:ID ZSet\nMySQL: 同事务写tb_blog与tb_feed_outbox",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "业务结果；检查success字段",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "required": [
+                        "success"
+                      ],
+                      "properties": {
+                        "success": {
+                          "type": "boolean",
+                          "enum": [
+                            true
+                          ]
+                        },
+                        "data": {
+                          "type": "integer",
+                          "format": "int64"
+                        }
+                      }
+                    },
+                    {
+                      "$ref": "#/components/schemas/Error"
+                    }
+                  ]
+                },
+                "examples": {
+                  "success": {
+                    "value": {
+                      "success": true,
+                      "data": 5
+                    }
+                  },
+                  "failure": {
+                    "value": {
+                      "success": false,
+                      "errorMsg": "请求参数无效"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "缺少或失效Token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "系统故障",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖或短信服务不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BlogInput"
+              },
+              "example": {
+                "shopId": 1,
+                "title": "探店笔记",
+                "images": "/imgs/demo.png",
+                "content": "这是一篇学习笔记"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/blog/like/{id}": {
+      "put": {
+        "summary": "切换点赞",
+        "operationId": "put__blog_like__id_",
+        "tags": [
+          "blog"
+        ],
+        "security": [
+          {
+            "token": []
+          }
+        ],
+        "description": "重复请求会切换回取消；该接口不是幂等PUT语义，沿用原路由，网络未知结果不要盲重试。\nRedis: 从持久明细更新blog:liked:ID ZSet\nMySQL: 锁定Blog行，事务切换tb_blog_like并更新liked",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            },
+            "description": "目标资源ID，正整数",
+            "example": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "业务结果；检查success字段",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "required": [
+                        "success"
+                      ],
+                      "properties": {
+                        "success": {
+                          "type": "boolean",
+                          "enum": [
+                            true
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "$ref": "#/components/schemas/Error"
+                    }
+                  ]
+                },
+                "examples": {
+                  "success": {
+                    "value": {
+                      "success": true
+                    }
+                  },
+                  "failure": {
+                    "value": {
+                      "success": false,
+                      "errorMsg": "请求参数无效"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "缺少或失效Token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "系统故障",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖或短信服务不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/blog/likes/{id}": {
+      "get": {
+        "summary": "最早点赞用户",
+        "operationId": "get__blog_likes__id_",
+        "tags": [
+          "blog"
+        ],
+        "security": [
+          {
+            "token": []
+          }
+        ],
+        "description": "返回最早5个赞；同毫秒按Redis成员字典序，Redis失败用DB结果。\nRedis: 重建blog:liked:ID；ZRANGE 0 4\nMySQL: 读取持久点赞明细及用户",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            },
+            "description": "目标资源ID，正整数",
+            "example": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "业务结果；检查success字段",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "required": [
+                        "success"
+                      ],
+                      "properties": {
+                        "success": {
+                          "type": "boolean",
+                          "enum": [
+                            true
+                          ]
+                        },
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/UserDTO"
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "$ref": "#/components/schemas/Error"
+                    }
+                  ]
+                },
+                "examples": {
+                  "success": {
+                    "value": {
+                      "success": true,
+                      "data": [
+                        {
+                          "id": 1,
+                          "nickName": "学习用户一",
+                          "icon": ""
+                        }
+                      ]
+                    }
+                  },
+                  "failure": {
+                    "value": {
+                      "success": false,
+                      "errorMsg": "请求参数无效"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "缺少或失效Token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "系统故障",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖或短信服务不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/blog/of/me": {
+      "get": {
+        "summary": "我的笔记",
+        "operationId": "get__blog_of_me",
+        "tags": [
+          "blog"
+        ],
+        "security": [
+          {
+            "token": []
+          }
+        ],
+        "description": "每页10条；此接口沿用原未富化的Blog列表。\nRedis: 仅会话续期\nMySQL: tb_blog按当前user_id，id desc",
+        "parameters": [
+          {
+            "name": "current",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "页码；默认1。商铺上限1000，Blog上限100000。",
+            "example": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "业务结果；检查success字段",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "required": [
+                        "success"
+                      ],
+                      "properties": {
+                        "success": {
+                          "type": "boolean",
+                          "enum": [
+                            true
+                          ]
+                        },
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/Blog"
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "$ref": "#/components/schemas/Error"
+                    }
+                  ]
+                },
+                "examples": {
+                  "success": {
+                    "value": {
+                      "success": true,
+                      "data": [
+                        {
+                          "id": 1,
+                          "shopId": 1,
+                          "userId": 1,
+                          "title": "探店笔记",
+                          "images": "/imgs/demo.png",
+                          "content": "这是一篇学习笔记",
+                          "liked": 1,
+                          "name": "学习用户一",
+                          "icon": "",
+                          "isLike": true
+                        }
+                      ]
+                    }
+                  },
+                  "failure": {
+                    "value": {
+                      "success": false,
+                      "errorMsg": "请求参数无效"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "缺少或失效Token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "系统故障",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖或短信服务不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/blog/of/user": {
+      "get": {
+        "summary": "指定用户笔记",
+        "operationId": "get__blog_of_user",
+        "tags": [
+          "blog"
+        ],
+        "security": [
+          {
+            "token": []
+          }
+        ],
+        "description": "每页10条。\nRedis: 仅会话续期\nMySQL: tb_blog按目标user_id，id desc",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "用户ID，正整数",
+            "example": 1
+          },
+          {
+            "name": "current",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "页码；默认1。商铺上限1000，Blog上限100000。",
+            "example": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "业务结果；检查success字段",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "required": [
+                        "success"
+                      ],
+                      "properties": {
+                        "success": {
+                          "type": "boolean",
+                          "enum": [
+                            true
+                          ]
+                        },
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/Blog"
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "$ref": "#/components/schemas/Error"
+                    }
+                  ]
+                },
+                "examples": {
+                  "success": {
+                    "value": {
+                      "success": true,
+                      "data": [
+                        {
+                          "id": 1,
+                          "shopId": 1,
+                          "userId": 1,
+                          "title": "探店笔记",
+                          "images": "/imgs/demo.png",
+                          "content": "这是一篇学习笔记",
+                          "liked": 1,
+                          "name": "学习用户一",
+                          "icon": "",
+                          "isLike": true
+                        }
+                      ]
+                    }
+                  },
+                  "failure": {
+                    "value": {
+                      "success": false,
+                      "errorMsg": "请求参数无效"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "缺少或失效Token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "系统故障",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖或短信服务不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/blog/of/follow": {
+      "get": {
+        "summary": "关注Feed滚动分页",
+        "operationId": "get__blog_of_follow",
+        "tags": [
+          "blog"
+        ],
+        "security": [
+          {
+            "token": []
+          }
+        ],
+        "description": "每页2条；下一页带minTime作为lastId和offset原值；到底返回success:true无data。默认lastId为当前毫秒。\nRedis: ZREVRANGEBYSCORE feed:当前用户；可从持久outbox恢复\nMySQL: 按ID有序回查Blog并富化作者点赞",
+        "parameters": [
+          {
+            "name": "lastId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "最大毫秒时间戳，包含该分值",
+            "example": 1788790000000
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "该分值已消费数量；0..100000",
+            "example": 0
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "业务结果；检查success字段",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "required": [
+                        "success"
+                      ],
+                      "properties": {
+                        "success": {
+                          "type": "boolean",
+                          "enum": [
+                            true
+                          ]
+                        },
+                        "data": {
+                          "$ref": "#/components/schemas/ScrollResult"
+                        }
+                      }
+                    },
+                    {
+                      "$ref": "#/components/schemas/Error"
+                    }
+                  ]
+                },
+                "examples": {
+                  "success": {
+                    "value": {
+                      "success": true,
+                      "data": {
+                        "list": [
+                          {
+                            "id": 1,
+                            "shopId": 1,
+                            "userId": 1,
+                            "title": "探店笔记",
+                            "images": "/imgs/demo.png",
+                            "content": "这是一篇学习笔记",
+                            "liked": 1,
+                            "name": "学习用户一",
+                            "icon": "",
+                            "isLike": true
+                          }
+                        ],
+                        "minTime": 1788790000000,
+                        "offset": 1
+                      }
+                    }
+                  },
+                  "failure": {
+                    "value": {
+                      "success": false,
+                      "errorMsg": "请求参数无效"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "缺少或失效Token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "系统故障",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖或短信服务不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/follow/{id}/{isFollow}": {
+      "put": {
+        "summary": "关注/取消关注",
+        "operationId": "put__follow__id___isFollow_",
+        "tags": [
+          "follow"
+        ],
+        "security": [
+          {
+            "token": []
+          }
+        ],
+        "description": "目标用户须存在且不能关注自己；重复true/false幂等。\nRedis: 刷新follows:当前用户 Set\nMySQL: tb_follow唯一(user_id,follow_user_id)，true插入false删除",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            },
+            "description": "目标资源ID，正整数",
+            "example": 1
+          },
+          {
+            "name": "isFollow",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "boolean"
+            },
+            "description": "true关注/false取消",
+            "example": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "业务结果；检查success字段",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "required": [
+                        "success"
+                      ],
+                      "properties": {
+                        "success": {
+                          "type": "boolean",
+                          "enum": [
+                            true
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "$ref": "#/components/schemas/Error"
+                    }
+                  ]
+                },
+                "examples": {
+                  "success": {
+                    "value": {
+                      "success": true
+                    }
+                  },
+                  "failure": {
+                    "value": {
+                      "success": false,
+                      "errorMsg": "请求参数无效"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "缺少或失效Token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "系统故障",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖或短信服务不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/follow/or/not/{id}": {
+      "get": {
+        "summary": "是否关注",
+        "operationId": "get__follow_or_not__id_",
+        "tags": [
+          "follow"
+        ],
+        "security": [
+          {
+            "token": []
+          }
+        ],
+        "description": "\nRedis: 仅会话续期\nMySQL: 查询tb_follow",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            },
+            "description": "目标资源ID，正整数",
+            "example": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "业务结果；检查success字段",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "required": [
+                        "success"
+                      ],
+                      "properties": {
+                        "success": {
+                          "type": "boolean",
+                          "enum": [
+                            true
+                          ]
+                        },
+                        "data": {
+                          "type": "boolean"
+                        }
+                      }
+                    },
+                    {
+                      "$ref": "#/components/schemas/Error"
+                    }
+                  ]
+                },
+                "examples": {
+                  "success": {
+                    "value": {
+                      "success": true,
+                      "data": true
+                    }
+                  },
+                  "failure": {
+                    "value": {
+                      "success": false,
+                      "errorMsg": "请求参数无效"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "缺少或失效Token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "系统故障",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖或短信服务不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/follow/common/{id}": {
+      "get": {
+        "summary": "共同关注",
+        "operationId": "get__follow_common__id_",
+        "tags": [
+          "follow"
+        ],
+        "security": [
+          {
+            "token": []
+          }
+        ],
+        "description": "Redis不可用时回退持久关注交集。\nRedis: 重建两用户Set并SINTER\nMySQL: 锁定用户行顺序读取tb_follow，回查用户",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            },
+            "description": "目标资源ID，正整数",
+            "example": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "业务结果；检查success字段",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "required": [
+                        "success"
+                      ],
+                      "properties": {
+                        "success": {
+                          "type": "boolean",
+                          "enum": [
+                            true
+                          ]
+                        },
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/UserDTO"
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "$ref": "#/components/schemas/Error"
+                    }
+                  ]
+                },
+                "examples": {
+                  "success": {
+                    "value": {
+                      "success": true,
+                      "data": [
+                        {
+                          "id": 1,
+                          "nickName": "学习用户一",
+                          "icon": ""
+                        }
+                      ]
+                    }
+                  },
+                  "failure": {
+                    "value": {
+                      "success": false,
+                      "errorMsg": "请求参数无效"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "缺少或失效Token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "系统故障",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖或短信服务不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/voucher": {
+      "post": {
+        "summary": "新增普通优惠券",
+        "operationId": "post__voucher",
+        "tags": [
+          "voucher"
+        ],
+        "security": [
+          {
+            "token": []
+          }
+        ],
+        "description": "原匿名写接口改为须登录。\nRedis: 不写秒杀库存\nMySQL: INSERT tb_voucher，type=0,status=1",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "业务结果；检查success字段",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "required": [
+                        "success"
+                      ],
+                      "properties": {
+                        "success": {
+                          "type": "boolean",
+                          "enum": [
+                            true
+                          ]
+                        },
+                        "data": {
+                          "type": "integer",
+                          "format": "int64"
+                        }
+                      }
+                    },
+                    {
+                      "$ref": "#/components/schemas/Error"
+                    }
+                  ]
+                },
+                "examples": {
+                  "success": {
+                    "value": {
+                      "success": true,
+                      "data": 3
+                    }
+                  },
+                  "failure": {
+                    "value": {
+                      "success": false,
+                      "errorMsg": "请求参数无效"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "缺少或失效Token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "系统故障",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖或短信服务不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VoucherInput"
+              },
+              "example": {
+                "shopId": 1,
+                "title": "普通券",
+                "payValue": 8000,
+                "actualValue": 10000
+              }
+            }
+          }
+        }
+      }
+    },
+    "/voucher/seckill": {
+      "post": {
+        "summary": "新增秒杀券",
+        "operationId": "post__voucher_seckill",
+        "tags": [
+          "voucher"
+        ],
+        "security": [
+          {
+            "token": []
+          }
+        ],
+        "description": "原匿名写改须登录。DB已提交而Redis初始化失败时需按SECKILL.md修复，勿直接重复新增。\nRedis: 初始化库存String、时间Hash、已购Hash\nMySQL: 事务写tb_voucher及tb_seckill_voucher",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "业务结果；检查success字段",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "required": [
+                        "success"
+                      ],
+                      "properties": {
+                        "success": {
+                          "type": "boolean",
+                          "enum": [
+                            true
+                          ]
+                        },
+                        "data": {
+                          "type": "integer",
+                          "format": "int64"
+                        }
+                      }
+                    },
+                    {
+                      "$ref": "#/components/schemas/Error"
+                    }
+                  ]
+                },
+                "examples": {
+                  "success": {
+                    "value": {
+                      "success": true,
+                      "data": 4
+                    }
+                  },
+                  "failure": {
+                    "value": {
+                      "success": false,
+                      "errorMsg": "请求参数无效"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "缺少或失效Token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "系统故障",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖或短信服务不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VoucherInput"
+              },
+              "example": {
+                "shopId": 1,
+                "title": "秒杀券",
+                "payValue": 5000,
+                "actualValue": 10000,
+                "stock": 10,
+                "beginTime": "2020-01-01T00:00:00+08:00",
+                "endTime": "2037-01-01T00:00:00+08:00"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/voucher/list/{shopId}": {
+      "get": {
+        "summary": "商铺优惠券列表",
+        "operationId": "get__voucher_list__shopId_",
+        "tags": [
+          "voucher"
+        ],
+        "security": [],
+        "description": "保持原查询规则，不额外按时间过滤。\nRedis: 无\nMySQL: tb_voucher LEFT JOIN tb_seckill_voucher；status=1",
+        "parameters": [
+          {
+            "name": "shopId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            },
+            "description": "目标资源ID，正整数",
+            "example": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "业务结果；检查success字段",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "required": [
+                        "success"
+                      ],
+                      "properties": {
+                        "success": {
+                          "type": "boolean",
+                          "enum": [
+                            true
+                          ]
+                        },
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/Voucher"
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "$ref": "#/components/schemas/Error"
+                    }
+                  ]
+                },
+                "examples": {
+                  "success": {
+                    "value": {
+                      "success": true,
+                      "data": [
+                        {
+                          "id": 2,
+                          "shopId": 1,
+                          "title": "学习秒杀券",
+                          "payValue": 5000,
+                          "actualValue": 10000,
+                          "type": 1,
+                          "status": 1,
+                          "stock": 100,
+                          "beginTime": "2020-01-01T00:00:00+08:00",
+                          "endTime": "2037-01-01T00:00:00+08:00"
+                        }
+                      ]
+                    }
+                  },
+                  "failure": {
+                    "value": {
+                      "success": false,
+                      "errorMsg": "请求参数无效"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "缺少或失效Token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "系统故障",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖或短信服务不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/voucher-order/seckill/{id}": {
+      "post": {
+        "summary": "秒杀下单",
+        "operationId": "post__voucher_order_seckill__id_",
+        "tags": [
+          "voucher-order"
+        ],
+        "security": [
+          {
+            "token": []
+          }
+        ],
+        "description": "返回表示已受理，非已持久化。默认数字保持Java兼容；传idAsString=true返回精确字符串。响应头X-Order-ID始终提供精确字符串。\nRedis: Lua检查时间、库存、一人一单并原子预扣+XADD+pending状态\nMySQL: 请求通常不写DB；后台事务条件扣库存+插订单",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            },
+            "description": "目标资源ID，正整数",
+            "example": 1
+          },
+          {
+            "name": "idAsString",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            },
+            "description": "true时data为精确十进制字符串；浏览器新代码建议开启",
+            "example": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "业务结果；检查success字段",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "required": [
+                        "success"
+                      ],
+                      "properties": {
+                        "success": {
+                          "type": "boolean",
+                          "enum": [
+                            true
+                          ]
+                        },
+                        "data": {
+                          "oneOf": [
+                            {
+                              "type": "integer",
+                              "format": "int64"
+                            },
+                            {
+                              "type": "string"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "$ref": "#/components/schemas/Error"
+                    }
+                  ]
+                },
+                "examples": {
+                  "success": {
+                    "value": {
+                      "success": true,
+                      "data": "633000000000000001"
+                    }
+                  },
+                  "failure": {
+                    "value": {
+                      "success": false,
+                      "errorMsg": "库存不足"
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "X-Order-ID": {
+                "description": "成功受理时返回精确订单ID字符串",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "缺少或失效Token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "系统故障",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖或短信服务不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/voucher-order/{id}": {
+      "get": {
+        "summary": "查询自己的已落库订单",
+        "operationId": "get__voucher_order__id_",
+        "tags": [
+          "voucher-order"
+        ],
+        "security": [
+          {
+            "token": []
+          }
+        ],
+        "description": "新增；未落库/不属于当前用户都返回资源不存在。\nRedis: 仅会话续期\nMySQL: SELECT tb_voucher_order WHERE id AND user_id",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            },
+            "description": "目标资源ID，正整数",
+            "example": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "业务结果；检查success字段",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "required": [
+                        "success"
+                      ],
+                      "properties": {
+                        "success": {
+                          "type": "boolean",
+                          "enum": [
+                            true
+                          ]
+                        },
+                        "data": {
+                          "$ref": "#/components/schemas/VoucherOrder"
+                        }
+                      }
+                    },
+                    {
+                      "$ref": "#/components/schemas/Error"
+                    }
+                  ]
+                },
+                "examples": {
+                  "success": {
+                    "value": {
+                      "success": true,
+                      "data": {
+                        "id": 633000000000000001,
+                        "userId": 1,
+                        "voucherId": 2,
+                        "status": 1,
+                        "payType": 1
+                      }
+                    }
+                  },
+                  "failure": {
+                    "value": {
+                      "success": false,
+                      "errorMsg": "请求参数无效"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "缺少或失效Token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "系统故障",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖或短信服务不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/voucher-order/status/{id}": {
+      "get": {
+        "summary": "查询异步订单状态",
+        "operationId": "get__voucher_order_status__id_",
+        "tags": [
+          "voucher-order"
+        ],
+        "security": [
+          {
+            "token": []
+          }
+        ],
+        "description": "新增；pending/created/failed；状态id是字符串。\nRedis: DB无订单时读取订单状态Hash\nMySQL: 优先MySQL权威订单",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            },
+            "description": "目标资源ID，正整数",
+            "example": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "业务结果；检查success字段",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "required": [
+                        "success"
+                      ],
+                      "properties": {
+                        "success": {
+                          "type": "boolean",
+                          "enum": [
+                            true
+                          ]
+                        },
+                        "data": {
+                          "$ref": "#/components/schemas/OrderStatus"
+                        }
+                      }
+                    },
+                    {
+                      "$ref": "#/components/schemas/Error"
+                    }
+                  ]
+                },
+                "examples": {
+                  "success": {
+                    "value": {
+                      "success": true,
+                      "data": {
+                        "id": "633000000000000001",
+                        "state": "pending"
+                      }
+                    }
+                  },
+                  "failure": {
+                    "value": {
+                      "success": false,
+                      "errorMsg": "请求参数无效"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "缺少或失效Token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "系统故障",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖或短信服务不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/upload/blog": {
+      "post": {
+        "summary": "上传笔记图片",
+        "operationId": "post__upload_blog",
+        "tags": [
+          "upload"
+        ],
+        "security": [
+          {
+            "token": []
+          }
+        ],
+        "description": "原匿名改登录；最多5MiB，按文件内容识别PNG/JPEG/GIF/WebP；返回路径供/imgs前缀使用。\nRedis: 仅会话续期\nMySQL: 无；写配置目录文件",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "业务结果；检查success字段",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "required": [
+                        "success"
+                      ],
+                      "properties": {
+                        "success": {
+                          "type": "boolean",
+                          "enum": [
+                            true
+                          ]
+                        },
+                        "data": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    {
+                      "$ref": "#/components/schemas/Error"
+                    }
+                  ]
+                },
+                "examples": {
+                  "success": {
+                    "value": {
+                      "success": true,
+                      "data": "/blogs/1/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.png"
+                    }
+                  },
+                  "failure": {
+                    "value": {
+                      "success": false,
+                      "errorMsg": "只支持 PNG/JPEG/GIF/WebP 图片"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "缺少或失效Token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "系统故障",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖或短信服务不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "file"
+                ],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/upload/blog/delete": {
+      "delete": {
+        "summary": "删除本人图片",
+        "operationId": "delete__upload_blog_delete",
+        "tags": [
+          "upload"
+        ],
+        "security": [
+          {
+            "token": []
+          }
+        ],
+        "description": "原匿名删除改为登录且只允许本人新格式文件；旧图片可保留读取，由运维迁移，不提供任意路径删除。\nRedis: 仅会话续期\nMySQL: 无；删除当前用户目录中的图片",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "上传接口返回的完整name",
+            "example": "/blogs/1/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.png"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "业务结果；检查success字段",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "required": [
+                        "success"
+                      ],
+                      "properties": {
+                        "success": {
+                          "type": "boolean",
+                          "enum": [
+                            true
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "$ref": "#/components/schemas/Error"
+                    }
+                  ]
+                },
+                "examples": {
+                  "success": {
+                    "value": {
+                      "success": true
+                    }
+                  },
+                  "failure": {
+                    "value": {
+                      "success": false,
+                      "errorMsg": "请求参数无效"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "缺少或失效Token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "系统故障",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖或短信服务不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health/live": {
+      "get": {
+        "summary": "存活检查",
+        "operationId": "get__health_live",
+        "tags": [
+          "health"
+        ],
+        "security": [],
+        "description": "运维接口；依赖不可用ready返回503。\nRedis: ready检查PING，live不检查\nMySQL: ready检查连接池PING，live不检查",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "业务结果；检查success字段",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "required": [
+                        "success"
+                      ],
+                      "properties": {
+                        "success": {
+                          "type": "boolean",
+                          "enum": [
+                            true
+                          ]
+                        },
+                        "data": {
+                          "type": "object",
+                          "properties": {
+                            "status": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "$ref": "#/components/schemas/Error"
+                    }
+                  ]
+                },
+                "examples": {
+                  "success": {
+                    "value": {
+                      "success": true,
+                      "data": {
+                        "status": "up"
+                      }
+                    }
+                  },
+                  "failure": {
+                    "value": {
+                      "success": false,
+                      "errorMsg": "请求参数无效"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "缺少或失效Token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "系统故障",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖或短信服务不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health/ready": {
+      "get": {
+        "summary": "就绪检查",
+        "operationId": "get__health_ready",
+        "tags": [
+          "health"
+        ],
+        "security": [],
+        "description": "运维接口；依赖不可用ready返回503。\nRedis: ready检查PING，live不检查\nMySQL: ready检查连接池PING，live不检查",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "业务结果；检查success字段",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "required": [
+                        "success"
+                      ],
+                      "properties": {
+                        "success": {
+                          "type": "boolean",
+                          "enum": [
+                            true
+                          ]
+                        },
+                        "data": {
+                          "type": "object",
+                          "properties": {
+                            "status": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "$ref": "#/components/schemas/Error"
+                    }
+                  ]
+                },
+                "examples": {
+                  "success": {
+                    "value": {
+                      "success": true,
+                      "data": {
+                        "status": "ready"
+                      }
+                    }
+                  },
+                  "failure": {
+                    "value": {
+                      "success": false,
+                      "errorMsg": "请求参数无效"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "缺少或失效Token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "系统故障",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖或短信服务不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "token": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "authorization",
+        "description": "直接填Token；也支持Bearer Token"
+      }
+    },
+    "schemas": {
+      "User": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64",
+            "description": "主键；int64。订单 ID 可能超过 JavaScript 精确整数范围。"
+          },
+          "phone": {
+            "type": "string",
+            "description": "手机号，不在用户公开DTO返回"
+          },
+          "nickName": {
+            "type": "string",
+            "description": "昵称"
+          },
+          "icon": {
+            "type": "string",
+            "description": "头像/图标路径"
+          },
+          "createTime": {
+            "type": "string",
+            "format": "date-time",
+            "description": "创建时间，RFC3339 带时区"
+          },
+          "updateTime": {
+            "type": "string",
+            "format": "date-time",
+            "description": "更新时间，RFC3339 带时区"
+          }
+        }
+      },
+      "UserInfo": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "integer",
+            "format": "int64",
+            "description": "用户 ID"
+          },
+          "city": {
+            "type": "string",
+            "description": "城市"
+          },
+          "introduce": {
+            "type": "string",
+            "description": "简介"
+          },
+          "fans": {
+            "type": "integer",
+            "format": "int64",
+            "description": "粉丝数量（原用户资料字段，不随关注实时统计）"
+          },
+          "followee": {
+            "type": "integer",
+            "format": "int64",
+            "description": "关注数（原资料字段）"
+          },
+          "gender": {
+            "type": "integer",
+            "format": "int64",
+            "description": "0男/1女（沿用原数据）"
+          },
+          "birthday": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "生日；当前输出RFC3339日期时间"
+          },
+          "credits": {
+            "type": "integer",
+            "format": "int64",
+            "description": "积分"
+          },
+          "level": {
+            "type": "integer",
+            "format": "int64",
+            "description": "会员等级0–9"
+          }
+        }
+      },
+      "Shop": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64",
+            "description": "主键；int64。订单 ID 可能超过 JavaScript 精确整数范围。"
+          },
+          "name": {
+            "type": "string",
+            "description": "名称；Blog 中为作者昵称"
+          },
+          "typeId": {
+            "type": "integer",
+            "format": "int64",
+            "description": "商铺类型 ID"
+          },
+          "images": {
+            "type": "string",
+            "description": "图片路径，多个以逗号分隔"
+          },
+          "area": {
+            "type": "string",
+            "description": "商圈"
+          },
+          "address": {
+            "type": "string",
+            "description": "地址"
+          },
+          "x": {
+            "type": "number",
+            "format": "double",
+            "description": "经度"
+          },
+          "y": {
+            "type": "number",
+            "format": "double",
+            "description": "纬度"
+          },
+          "avgPrice": {
+            "type": "integer",
+            "format": "int64",
+            "description": "整数均价（沿用原单位）"
+          },
+          "sold": {
+            "type": "integer",
+            "format": "int64",
+            "description": "销量"
+          },
+          "comments": {
+            "type": "integer",
+            "format": "int64",
+            "description": "评论数"
+          },
+          "score": {
+            "type": "integer",
+            "format": "int64",
+            "description": "评分乘 10；0–50"
+          },
+          "openHours": {
+            "type": "string",
+            "description": "营业时间"
+          },
+          "createTime": {
+            "type": "string",
+            "format": "date-time",
+            "description": "创建时间，RFC3339 带时区"
+          },
+          "updateTime": {
+            "type": "string",
+            "format": "date-time",
+            "description": "更新时间，RFC3339 带时区"
+          },
+          "distance": {
+            "type": "string",
+            "nullable": true,
+            "description": "距查询点的距离，单位米"
+          }
+        }
+      },
+      "ShopType": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64",
+            "description": "主键；int64。订单 ID 可能超过 JavaScript 精确整数范围。"
+          },
+          "name": {
+            "type": "string",
+            "description": "名称；Blog 中为作者昵称"
+          },
+          "icon": {
+            "type": "string",
+            "description": "头像/图标路径"
+          },
+          "sort": {
+            "type": "integer",
+            "format": "int64",
+            "description": "sort"
+          }
+        }
+      },
+      "Blog": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64",
+            "description": "主键；int64。订单 ID 可能超过 JavaScript 精确整数范围。"
+          },
+          "shopId": {
+            "type": "integer",
+            "format": "int64",
+            "description": "商铺 ID"
+          },
+          "userId": {
+            "type": "integer",
+            "format": "int64",
+            "description": "用户 ID"
+          },
+          "title": {
+            "type": "string",
+            "description": "标题"
+          },
+          "images": {
+            "type": "string",
+            "description": "图片路径，多个以逗号分隔"
+          },
+          "content": {
+            "type": "string",
+            "description": "正文"
+          },
+          "liked": {
+            "type": "integer",
+            "format": "int64",
+            "description": "点赞数"
+          },
+          "comments": {
+            "type": "integer",
+            "format": "int64",
+            "description": "评论数"
+          },
+          "createTime": {
+            "type": "string",
+            "format": "date-time",
+            "description": "创建时间，RFC3339 带时区"
+          },
+          "updateTime": {
+            "type": "string",
+            "format": "date-time",
+            "description": "更新时间，RFC3339 带时区"
+          },
+          "icon": {
+            "type": "string",
+            "description": "头像/图标路径"
+          },
+          "name": {
+            "type": "string",
+            "description": "名称；Blog 中为作者昵称"
+          },
+          "isLike": {
+            "type": "boolean",
+            "description": "当前用户是否点赞"
+          }
+        }
+      },
+      "BlogComment": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64",
+            "description": "主键；int64。订单 ID 可能超过 JavaScript 精确整数范围。"
+          },
+          "userId": {
+            "type": "integer",
+            "format": "int64",
+            "description": "用户 ID"
+          },
+          "blogId": {
+            "type": "integer",
+            "format": "int64",
+            "description": "blogId"
+          },
+          "parentId": {
+            "type": "integer",
+            "format": "int64",
+            "description": "一级评论ID；顶层为0"
+          },
+          "answerId": {
+            "type": "integer",
+            "format": "int64",
+            "description": "回复评论ID"
+          },
+          "content": {
+            "type": "string",
+            "description": "正文"
+          },
+          "liked": {
+            "type": "integer",
+            "format": "int64",
+            "description": "点赞数"
+          },
+          "status": {
+            "type": "integer",
+            "format": "int64",
+            "description": "状态：优惠券 1上架/2下架/3过期；订单1未支付/2已支付/3已核销/4取消/5退款中/6已退款"
+          },
+          "createTime": {
+            "type": "string",
+            "format": "date-time",
+            "description": "创建时间，RFC3339 带时区"
+          },
+          "updateTime": {
+            "type": "string",
+            "format": "date-time",
+            "description": "更新时间，RFC3339 带时区"
+          }
+        }
+      },
+      "BlogLike": {
+        "type": "object",
+        "properties": {
+          "blogId": {
+            "type": "integer",
+            "format": "int64",
+            "description": "blogId"
+          },
+          "userId": {
+            "type": "integer",
+            "format": "int64",
+            "description": "用户 ID"
+          },
+          "createTime": {
+            "type": "string",
+            "format": "date-time",
+            "description": "创建时间，RFC3339 带时区"
+          }
+        }
+      },
+      "Follow": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64",
+            "description": "主键；int64。订单 ID 可能超过 JavaScript 精确整数范围。"
+          },
+          "userId": {
+            "type": "integer",
+            "format": "int64",
+            "description": "用户 ID"
+          },
+          "followUserId": {
+            "type": "integer",
+            "format": "int64",
+            "description": "被关注用户ID"
+          },
+          "createTime": {
+            "type": "string",
+            "format": "date-time",
+            "description": "创建时间，RFC3339 带时区"
+          }
+        }
+      },
+      "FeedOutbox": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64",
+            "description": "主键；int64。订单 ID 可能超过 JavaScript 精确整数范围。"
+          },
+          "userId": {
+            "type": "integer",
+            "format": "int64",
+            "description": "用户 ID"
+          },
+          "blogId": {
+            "type": "integer",
+            "format": "int64",
+            "description": "blogId"
+          },
+          "score": {
+            "type": "integer",
+            "format": "int64",
+            "description": "评分乘 10；0–50"
+          },
+          "deliveredAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "deliveredAt"
+          },
+          "createTime": {
+            "type": "string",
+            "format": "date-time",
+            "description": "创建时间，RFC3339 带时区"
+          }
+        }
+      },
+      "Voucher": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64",
+            "description": "主键；int64。订单 ID 可能超过 JavaScript 精确整数范围。"
+          },
+          "shopId": {
+            "type": "integer",
+            "format": "int64",
+            "description": "商铺 ID"
+          },
+          "title": {
+            "type": "string",
+            "description": "标题"
+          },
+          "subTitle": {
+            "type": "string",
+            "description": "副标题"
+          },
+          "rules": {
+            "type": "string",
+            "description": "使用规则"
+          },
+          "payValue": {
+            "type": "integer",
+            "format": "int64",
+            "description": "支付金额，单位分"
+          },
+          "actualValue": {
+            "type": "integer",
+            "format": "int64",
+            "description": "抵扣金额，单位分"
+          },
+          "type": {
+            "type": "integer",
+            "format": "int64",
+            "description": "0普通券/1秒杀券"
+          },
+          "status": {
+            "type": "integer",
+            "format": "int64",
+            "description": "状态：优惠券 1上架/2下架/3过期；订单1未支付/2已支付/3已核销/4取消/5退款中/6已退款"
+          },
+          "createTime": {
+            "type": "string",
+            "format": "date-time",
+            "description": "创建时间，RFC3339 带时区"
+          },
+          "updateTime": {
+            "type": "string",
+            "format": "date-time",
+            "description": "更新时间，RFC3339 带时区"
+          },
+          "stock": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true,
+            "description": "剩余库存"
+          },
+          "beginTime": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "开始时间"
+          },
+          "endTime": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "结束时间"
+          }
+        }
+      },
+      "SeckillVoucher": {
+        "type": "object",
+        "properties": {
+          "voucherId": {
+            "type": "integer",
+            "format": "int64",
+            "description": "优惠券 ID"
+          },
+          "stock": {
+            "type": "integer",
+            "format": "int64",
+            "description": "剩余库存"
+          },
+          "createTime": {
+            "type": "string",
+            "format": "date-time",
+            "description": "创建时间，RFC3339 带时区"
+          },
+          "beginTime": {
+            "type": "string",
+            "format": "date-time",
+            "description": "开始时间"
+          },
+          "endTime": {
+            "type": "string",
+            "format": "date-time",
+            "description": "结束时间"
+          },
+          "updateTime": {
+            "type": "string",
+            "format": "date-time",
+            "description": "更新时间，RFC3339 带时区"
+          }
+        }
+      },
+      "VoucherOrder": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64",
+            "description": "主键；int64。订单 ID 可能超过 JavaScript 精确整数范围。"
+          },
+          "userId": {
+            "type": "integer",
+            "format": "int64",
+            "description": "用户 ID"
+          },
+          "voucherId": {
+            "type": "integer",
+            "format": "int64",
+            "description": "优惠券 ID"
+          },
+          "payType": {
+            "type": "integer",
+            "format": "int64",
+            "description": "1余额/2支付宝/3微信，仅存储字段，未实现支付接口"
+          },
+          "status": {
+            "type": "integer",
+            "format": "int64",
+            "description": "状态：优惠券 1上架/2下架/3过期；订单1未支付/2已支付/3已核销/4取消/5退款中/6已退款"
+          },
+          "createTime": {
+            "type": "string",
+            "format": "date-time",
+            "description": "创建时间，RFC3339 带时区"
+          },
+          "payTime": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "支付时间"
+          },
+          "useTime": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "核销时间"
+          },
+          "refundTime": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "退款时间"
+          },
+          "updateTime": {
+            "type": "string",
+            "format": "date-time",
+            "description": "更新时间，RFC3339 带时区"
+          }
+        }
+      },
+      "Sign": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64",
+            "description": "主键；int64。订单 ID 可能超过 JavaScript 精确整数范围。"
+          },
+          "userId": {
+            "type": "integer",
+            "format": "int64",
+            "description": "用户 ID"
+          },
+          "year": {
+            "type": "integer",
+            "format": "int64",
+            "description": "year"
+          },
+          "month": {
+            "type": "integer",
+            "format": "int64",
+            "description": "month"
+          },
+          "date": {
+            "type": "string",
+            "format": "date-time",
+            "description": "日期"
+          },
+          "isBackup": {
+            "type": "boolean",
+            "nullable": true,
+            "description": "是否补签"
+          }
+        }
+      },
+      "UserDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64",
+            "description": "主键；int64。订单 ID 可能超过 JavaScript 精确整数范围。"
+          },
+          "nickName": {
+            "type": "string",
+            "description": "昵称"
+          },
+          "icon": {
+            "type": "string",
+            "description": "头像/图标路径"
+          }
+        }
+      },
+      "LoginInput": {
+        "type": "object",
+        "required": [
+          "phone"
+        ],
+        "properties": {
+          "phone": {
+            "type": "string",
+            "pattern": "^1[3-9][0-9]{9}$"
+          },
+          "code": {
+            "type": "string",
+            "pattern": "^[0-9]{6}$",
+            "description": "验证码优先于password；仅可成功使用一次"
+          },
+          "password": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 72,
+            "description": "新增bcrypt密码登录；先用验证码登录设置密码"
+          }
+        }
+      },
+      "PasswordInput": {
+        "type": "object",
+        "required": [
+          "password"
+        ],
+        "properties": {
+          "password": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 72,
+            "description": "8–72字节"
+          }
+        }
+      },
+      "ShopInput": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64",
+            "description": "主键；int64。订单 ID 可能超过 JavaScript 精确整数范围。"
+          },
+          "name": {
+            "type": "string",
+            "description": "名称；Blog 中为作者昵称"
+          },
+          "typeId": {
+            "type": "integer",
+            "format": "int64",
+            "description": "商铺类型 ID"
+          },
+          "images": {
+            "type": "string",
+            "description": "图片路径，多个以逗号分隔"
+          },
+          "area": {
+            "type": "string",
+            "description": "商圈"
+          },
+          "address": {
+            "type": "string",
+            "description": "地址"
+          },
+          "x": {
+            "type": "number",
+            "format": "double",
+            "description": "经度"
+          },
+          "y": {
+            "type": "number",
+            "format": "double",
+            "description": "纬度"
+          },
+          "avgPrice": {
+            "type": "integer",
+            "format": "int64",
+            "description": "整数均价（沿用原单位）"
+          },
+          "sold": {
+            "type": "integer",
+            "format": "int64",
+            "description": "销量"
+          },
+          "comments": {
+            "type": "integer",
+            "format": "int64",
+            "description": "评论数"
+          },
+          "score": {
+            "type": "integer",
+            "format": "int64",
+            "description": "评分乘 10；0–50"
+          },
+          "openHours": {
+            "type": "string",
+            "description": "营业时间"
+          }
+        },
+        "description": "POST必填name,typeId,address,x,y；PUT必填id和至少一个更新字段，0值可更新，省略字段保持。"
+      },
+      "BlogInput": {
+        "type": "object",
+        "required": [
+          "shopId",
+          "title",
+          "images",
+          "content"
+        ],
+        "properties": {
+          "shopId": {
+            "type": "integer",
+            "format": "int64",
+            "description": "商铺 ID"
+          },
+          "title": {
+            "type": "string",
+            "description": "标题"
+          },
+          "images": {
+            "type": "string",
+            "description": "图片路径，多个以逗号分隔"
+          },
+          "content": {
+            "type": "string",
+            "description": "正文"
+          }
+        }
+      },
+      "VoucherInput": {
+        "type": "object",
+        "required": [
+          "shopId",
+          "title",
+          "payValue",
+          "actualValue"
+        ],
+        "properties": {
+          "shopId": {
+            "type": "integer",
+            "format": "int64",
+            "description": "商铺 ID"
+          },
+          "title": {
+            "type": "string",
+            "description": "标题"
+          },
+          "subTitle": {
+            "type": "string",
+            "description": "副标题"
+          },
+          "rules": {
+            "type": "string",
+            "description": "使用规则"
+          },
+          "payValue": {
+            "type": "integer",
+            "format": "int64",
+            "description": "支付金额，单位分"
+          },
+          "actualValue": {
+            "type": "integer",
+            "format": "int64",
+            "description": "抵扣金额，单位分"
+          },
+          "stock": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true,
+            "description": "剩余库存"
+          },
+          "beginTime": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "开始时间"
+          },
+          "endTime": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "结束时间"
+          }
+        },
+        "description": "金额>0，秒杀额外必填stock>0、beginTime、endTime。接受带时区RFC3339或无时区2006-01-02T15:04:05（按配置时区）。"
+      },
+      "ScrollResult": {
+        "type": "object",
+        "properties": {
+          "list": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Blog"
+            }
+          },
+          "minTime": {
+            "type": "integer",
+            "format": "int64",
+            "description": "下一页lastId，最小毫秒时间戳"
+          },
+          "offset": {
+            "type": "integer",
+            "description": "此minTime已消费条数，原样带到下一页"
+          }
+        }
+      },
+      "OrderStatus": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "精确订单ID字符串"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "created",
+              "failed"
+            ]
+          },
+          "error": {
+            "type": "string"
+          },
+          "order": {
+            "$ref": "#/components/schemas/VoucherOrder"
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "required": [
+          "success",
+          "errorMsg"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              false
+            ]
+          },
+          "errorMsg": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,6 @@
+/bin/
+/data/
+*.log
+coverage*
+.env
+configs/local.yaml

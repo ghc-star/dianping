@@ -1,0 +1,115 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="1120" viewBox="0 0 1800 1120">
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L10,5 L0,10 z" fill="#496579"/>
+    </marker>
+    <marker id="arrowAsync" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L10,5 L0,10 z" fill="#b06a36"/>
+    </marker>
+  </defs>
+  <rect x="0" y="0" width="1800" height="1120" fill="#f7fafc"/>
+  <text x="72" y="66" font-family="Noto Sans SC, Microsoft YaHei, sans-serif" font-size="32" font-weight="700" fill="#183243">Go 黑马点评 · 后端架构</text>
+  <text x="73" y="101" font-family="Noto Sans SC, Microsoft YaHei, sans-serif" font-size="16" fill="#637988">同步请求主链 + Redis 协调 + MySQL 持久化 + 后台异步 Worker</text>
+
+  <g id="request-group">
+    <rect x="45" y="145" width="1710" height="145" rx="18" fill="#eaf2f8" stroke="#b8cfdf" stroke-width="2"/>
+    <text x="72" y="178" font-family="Noto Sans SC, Microsoft YaHei, sans-serif" font-size="18" font-weight="700" fill="#315a73">请求入口</text>
+    <rect x="78" y="198" width="230" height="62" rx="12" fill="#ffffff" stroke="#7ea6bd" stroke-width="2"/>
+    <text x="193" y="225" text-anchor="middle" font-family="Noto Sans SC, Microsoft YaHei, sans-serif" font-size="20" font-weight="700" fill="#183243">客户端</text>
+    <text x="193" y="248" text-anchor="middle" font-family="Noto Sans SC, Microsoft YaHei, sans-serif" font-size="14" fill="#637988">HTTP / JSON / multipart</text>
+    <line x1="308" y1="229" x2="365" y2="229" stroke="#496579" stroke-width="3" marker-end="url(#arrow)"/>
+    <rect x="365" y="198" width="230" height="62" rx="12" fill="#ffffff" stroke="#7ea6bd" stroke-width="2"/>
+    <text x="480" y="225" text-anchor="middle" font-family="Noto Sans SC, Microsoft YaHei, sans-serif" font-size="20" font-weight="700" fill="#183243">Nginx（可选）</text>
+    <text x="480" y="248" text-anchor="middle" font-family="Noto Sans SC, Microsoft YaHei, sans-serif" font-size="14" fill="#637988">:8080/api → :8081</text>
+    <line x1="595" y1="229" x2="652" y2="229" stroke="#496579" stroke-width="3" marker-end="url(#arrow)"/>
+    <rect x="652" y="198" width="250" height="62" rx="12" fill="#ffffff" stroke="#548aa5" stroke-width="2"/>
+    <text x="777" y="225" text-anchor="middle" font-family="Noto Sans SC, Microsoft YaHei, sans-serif" font-size="20" font-weight="700" fill="#183243">Gin Router</text>
+    <text x="777" y="248" text-anchor="middle" font-family="Noto Sans SC, Microsoft YaHei, sans-serif" font-size="14" fill="#637988">router.go · 注册路由</text>
+    <line x1="902" y1="229" x2="959" y2="229" stroke="#496579" stroke-width="3" marker-end="url(#arrow)"/>
+    <rect x="959" y="198" width="330" height="62" rx="12" fill="#ffffff" stroke="#548aa5" stroke-width="2"/>
+    <text x="1124" y="225" text-anchor="middle" font-family="Noto Sans SC, Microsoft YaHei, sans-serif" font-size="20" font-weight="700" fill="#183243">Middleware</text>
+    <text x="1124" y="248" text-anchor="middle" font-family="Noto Sans SC, Microsoft YaHei, sans-serif" font-size="14" fill="#637988">AccessLog · Recovery · Auth</text>
+    <line x1="1289" y1="229" x2="1346" y2="229" stroke="#496579" stroke-width="3" marker-end="url(#arrow)"/>
+    <rect x="1346" y="198" width="330" height="62" rx="12" fill="#ffffff" stroke="#548aa5" stroke-width="2"/>
+    <text x="1511" y="225" text-anchor="middle" font-family="Noto Sans SC, Microsoft YaHei, sans-serif" font-size="20" font-weight="700" fill="#183243">Handler</text>
+    <text x="1511" y="248" text-anchor="middle" font-family="Noto Sans SC, Microsoft YaHei, sans-serif" font-size="14" fill="#637988">绑定、校验、调用、响应</text>
+  </g>
+
+  <g id="sync-group">
+    <rect x="45" y="330" width="1710" height="270" rx="18" fill="#eef7f1" stroke="#b8d7c1" stroke-width="2"/>
+    <text x="72" y="364" font-family="Noto Sans SC, Microsoft YaHei, sans-serif" font-size="18" font-weight="700" fill="#397052">业务编排层</text>
+    <rect x="105" y="400" width="490" height="145" rx="14" fill="#ffffff" stroke="#6ca681" stroke-width="2"/>
+    <text x="350" y="437" text-anchor="middle" font-family="Noto Sans SC, Microsoft YaHei, sans-serif" font-size="24" font-weight="700" fill="#214c35">Service</text>
+    <text x="135" y="470" font-family="Noto Sans SC, Microsoft YaHei, sans-serif" font-size="16" fill="#3e5d4b">UserService · ShopService</text>
+    <text x="135" y="496" font-family="Noto Sans SC, Microsoft YaHei, sans-serif" font-size="16" fill="#3e5d4b">SocialService · VoucherService</text>
+    <text x="135" y="526" font-family="Noto Sans SC, Microsoft YaHei, sans-serif" font-size="14" fill="#6c8374">业务规则、缓存协调、事务编排</text>
+    <line x1="595" y1="472" x2="665" y2="472" stroke="#496579" stroke-width="3" marker-end="url(#arrow)"/>
+    <rect x="665" y="400" width="360" height="145" rx="14" fill="#ffffff" stroke="#6ca681" stroke-width="2"/>
+    <text x="845" y="437" text-anchor="middle" font-family="Noto Sans SC, Microsoft YaHei, sans-serif" font-size="24" font-weight="700" fill="#214c35">Repository</text>
+    <text x="695" y="470" font-family="Noto Sans SC, Microsoft YaHei, sans-serif" font-size="16" fill="#3e5d4b">GORM 查询与持久化边界</text>
+    <text x="695" y="498" font-family="Noto Sans SC, Microsoft YaHei, sans-serif" font-size="16" fill="#3e5d4b">WithContext(ctx) · 条件更新</text>
+    <text x="695" y="526" font-family="Noto Sans SC, Microsoft YaHei, sans-serif" font-size="14" fill="#6c8374">不处理 HTTP 状态码</text>
+    <line x1="1025" y1="472" x2="1095" y2="472" stroke="#496579" stroke-width="3" marker-end="url(#arrow)"/>
+    <rect x="1095" y="400" width="280" height="145" rx="14" fill="#ffffff" stroke="#6ca681" stroke-width="2"/>
+    <text x="1235" y="437" text-anchor="middle" font-family="Noto Sans SC, Microsoft YaHei, sans-serif" font-size="24" font-weight="700" fill="#214c35">GORM</text>
+    <text x="1125" y="470" font-family="Noto Sans SC, Microsoft YaHei, sans-serif" font-size="16" fill="#3e5d4b">模型映射</text>
+    <text x="1125" y="498" font-family="Noto Sans SC, Microsoft YaHei, sans-serif" font-size="16" fill="#3e5d4b">事务与连接池</text>
+    <text x="1125" y="526" font-family="Noto Sans SC, Microsoft YaHei, sans-serif" font-size="14" fill="#6c8374">数据库访问抽象</text>
+    <line x1="1375" y1="472" x2="1445" y2="472" stroke="#496579" stroke-width="3" marker-end="url(#arrow)"/>
+    <rect x="1445" y="400" width="240" height="145" rx="14" fill="#ffffff" stroke="#6ca681" stroke-width="2"/>
+    <text x="1565" y="437" text-anchor="middle" font-family="Noto Sans SC, Microsoft YaHei, sans-serif" font-size="24" font-weight="700" fill="#214c35">MySQL</text>
+    <text x="1475" y="470" font-family="Noto Sans SC, Microsoft YaHei, sans-serif" font-size="16" fill="#3e5d4b">数据权威来源</text>
+    <text x="1475" y="498" font-family="Noto Sans SC, Microsoft YaHei, sans-serif" font-size="16" fill="#3e5d4b">事务、唯一索引</text>
+    <text x="1475" y="526" font-family="Noto Sans SC, Microsoft YaHei, sans-serif" font-size="14" fill="#6c8374">13 张核心业务表</text>
+    <polyline points="1235,400 1235,385 350,385 350,400" fill="none" stroke="#5d9c73" stroke-width="2.5" stroke-dasharray="8 7" marker-end="url(#arrow)"/>
+    <text x="782" y="379" text-anchor="middle" font-family="Noto Sans SC, Microsoft YaHei, sans-serif" font-size="14" fill="#397052">Service 也可直接协调 Redis / cache</text>
+  </g>
+
+  <g id="redis-group">
+    <rect x="45" y="645" width="830" height="410" rx="18" fill="#fff5ed" stroke="#e5c4a7" stroke-width="2"/>
+    <text x="72" y="680" font-family="Noto Sans SC, Microsoft YaHei, sans-serif" font-size="18" font-weight="700" fill="#9a5b2e">Redis 协调层</text>
+    <rect x="92" y="720" width="315" height="120" rx="14" fill="#ffffff" stroke="#d18b55" stroke-width="2"/>
+    <text x="249" y="756" text-anchor="middle" font-family="Noto Sans SC, Microsoft YaHei, sans-serif" font-size="23" font-weight="700" fill="#814820">Redis</text>
+    <text x="122" y="788" font-family="Noto Sans SC, Microsoft YaHei, sans-serif" font-size="16" fill="#76543e">会话 · 缓存 · Bitmap</text>
+    <text x="122" y="816" font-family="Noto Sans SC, Microsoft YaHei, sans-serif" font-size="16" fill="#76543e">Set / ZSet / GEO / Stream</text>
+    <rect x="460" y="720" width="350" height="120" rx="14" fill="#ffffff" stroke="#d18b55" stroke-width="2"/>
+    <text x="635" y="756" text-anchor="middle" font-family="Noto Sans SC, Microsoft YaHei, sans-serif" font-size="23" font-weight="700" fill="#814820">redisx / cache / lock</text>
+    <text x="490" y="788" font-family="Noto Sans SC, Microsoft YaHei, sans-serif" font-size="16" fill="#76543e">Key、Lua、Cache Aside</text>
+    <text x="490" y="816" font-family="Noto Sans SC, Microsoft YaHei, sans-serif" font-size="16" fill="#76543e">singleflight · 分布式锁</text>
+    <polyline points="350,545 350,620 249,620 249,720" fill="none" stroke="#b06a36" stroke-width="3" marker-end="url(#arrowAsync)"/>
+    <polyline points="350,620 635,620 635,720" fill="none" stroke="#b06a36" stroke-width="3" marker-end="url(#arrowAsync)"/>
+    <text x="360" y="610" font-family="Noto Sans SC, Microsoft YaHei, sans-serif" font-size="14" fill="#9a5b2e">Service 协调</text>
+    <rect x="92" y="890" width="718" height="126" rx="14" fill="#fffaf6" stroke="#e1b58e" stroke-width="2"/>
+    <text x="116" y="925" font-family="Noto Sans SC, Microsoft YaHei, sans-serif" font-size="18" font-weight="700" fill="#814820">典型用途</text>
+    <text x="116" y="956" font-family="Noto Sans SC, Microsoft YaHei, sans-serif" font-size="15" fill="#76543e">登录 Token Hash · 商铺 Cache Aside · Feed ZSet</text>
+    <text x="116" y="984" font-family="Noto Sans SC, Microsoft YaHei, sans-serif" font-size="15" fill="#76543e">签到 Bitmap · GEO 附近商铺 · 秒杀 Lua + Stream</text>
+  </g>
+
+  <g id="async-group">
+    <rect x="925" y="645" width="830" height="410" rx="18" fill="#f4effa" stroke="#cdbde0" stroke-width="2"/>
+    <text x="952" y="680" font-family="Noto Sans SC, Microsoft YaHei, sans-serif" font-size="18" font-weight="700" fill="#6c4d86">后台异步链路</text>
+    <rect x="970" y="720" width="255" height="120" rx="14" fill="#ffffff" stroke="#9b7ab5" stroke-width="2"/>
+    <text x="1097" y="756" text-anchor="middle" font-family="Noto Sans SC, Microsoft YaHei, sans-serif" font-size="22" font-weight="700" fill="#5d4076">Redis Lua</text>
+    <text x="995" y="788" font-family="Noto Sans SC, Microsoft YaHei, sans-serif" font-size="15" fill="#665477">校验时间、库存</text>
+    <text x="995" y="816" font-family="Noto Sans SC, Microsoft YaHei, sans-serif" font-size="15" fill="#665477">一人一单、XADD</text>
+    <line x1="1225" y1="780" x2="1290" y2="780" stroke="#b06a36" stroke-width="3" stroke-dasharray="9 6" marker-end="url(#arrowAsync)"/>
+    <rect x="1290" y="720" width="245" height="120" rx="14" fill="#ffffff" stroke="#9b7ab5" stroke-width="2"/>
+    <text x="1412" y="756" text-anchor="middle" font-family="Noto Sans SC, Microsoft YaHei, sans-serif" font-size="22" font-weight="700" fill="#5d4076">Stream</text>
+    <text x="1315" y="788" font-family="Noto Sans SC, Microsoft YaHei, sans-serif" font-size="15" fill="#665477">订单消息</text>
+    <text x="1315" y="816" font-family="Noto Sans SC, Microsoft YaHei, sans-serif" font-size="15" fill="#665477">Pending / ACK</text>
+    <line x1="1535" y1="780" x2="1600" y2="780" stroke="#b06a36" stroke-width="3" stroke-dasharray="9 6" marker-end="url(#arrowAsync)"/>
+    <rect x="1600" y="720" width="120" height="120" rx="14" fill="#ffffff" stroke="#9b7ab5" stroke-width="2"/>
+    <text x="1660" y="756" text-anchor="middle" font-family="Noto Sans SC, Microsoft YaHei, sans-serif" font-size="19" font-weight="700" fill="#5d4076">Order</text>
+    <text x="1660" y="781" text-anchor="middle" font-family="Noto Sans SC, Microsoft YaHei, sans-serif" font-size="19" font-weight="700" fill="#5d4076">Worker</text>
+    <text x="1660" y="816" text-anchor="middle" font-family="Noto Sans SC, Microsoft YaHei, sans-serif" font-size="13" fill="#665477">消费组</text>
+    <polyline points="1097,840 1097,870 1412,870 1412,840" fill="none" stroke="#b06a36" stroke-width="3" stroke-dasharray="9 6"/>
+    <polyline points="1660,840 1660,870 1235,870 1235,472" fill="none" stroke="#b06a36" stroke-width="3" stroke-dasharray="9 6" marker-end="url(#arrowAsync)"/>
+    <text x="1330" y="895" text-anchor="middle" font-family="Noto Sans SC, Microsoft YaHei, sans-serif" font-size="14" fill="#9a5b2e">消费后回到 Repository → GORM → MySQL 事务</text>
+    <rect x="970" y="930" width="750" height="86" rx="14" fill="#fbf8ff" stroke="#cdbde0" stroke-width="2"/>
+    <text x="995" y="965" font-family="Noto Sans SC, Microsoft YaHei, sans-serif" font-size="15" fill="#665477">Blog 发布：MySQL Blog + FeedOutbox 事务写入 → 后台投递 → Feed ZSet</text>
+    <text x="995" y="992" font-family="Noto Sans SC, Microsoft YaHei, sans-serif" font-size="15" fill="#665477">客户端收到订单号仅代表受理；查询 status，created 后才是落库成功</text>
+  </g>
+
+  <line x1="45" y1="1080" x2="1755" y2="1080" stroke="#d7e0e6" stroke-width="2"/>
+  <text x="72" y="1105" font-family="Noto Sans SC, Microsoft YaHei, sans-serif" font-size="14" fill="#637988">代码入口：cmd/server/main.go → internal/handler/router.go → internal/service → internal/repository / internal/redisx → worker</text>
+</svg>

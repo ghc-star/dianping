@@ -1,0 +1,26 @@
+server:
+  address: ":8081"
+  mode: debug
+  read_timeout: 10s
+  write_timeout: 15s
+  shutdown_timeout: 10s
+mysql:
+  dsn: "dianping:dianping_dev@tcp(127.0.0.1:3307)/go_dianping?charset=utf8mb4&parseTime=true&loc=Asia%2FShanghai"
+  max_open: 20
+  max_idle: 5
+redis:
+  address: "127.0.0.1:6380"
+  password: ""
+  db: 0
+auth:
+  code_ttl: 2m
+  session_ttl: 30m
+  code_interval: 60s
+  dev_code_log: true
+upload:
+  directory: ./data/uploads
+  max_bytes: 5242880
+worker:
+  concurrency: 2
+  claim_idle: 30s
+timezone: Asia/Shanghai

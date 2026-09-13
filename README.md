@@ -1199,3 +1199,17 @@ UV统计（Unique Visitor Statistics）是用于衡量网站、应用程序或�
 
 ```
 
+# Go 重构版入口
+
+完整 Go 后端已经放在 [go-dianping/](go-dianping/README.md)。原 Java/Spring Boot 源码和下方说明保留，用于 Java → Go 对照学习。
+
+快速启动：
+
+```bash
+cd go-dianping
+docker compose up -d --build
+```
+
+接口地址为 `http://localhost:8081`，Nginx 兼容入口为 `http://localhost:8080/api`，接口浏览页为 `http://localhost:8081/docs`。
+
+---

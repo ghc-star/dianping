@@ -1,0 +1,61 @@
+name: go-dianping
+services:
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_DATABASE: go_dianping
+      MYSQL_USER: dianping
+      MYSQL_PASSWORD: dianping_dev
+      MYSQL_ROOT_PASSWORD: root_dev_only
+      TZ: Asia/Shanghai
+    ports: ["127.0.0.1:3307:3306"]
+    volumes: ["mysql-data:/var/lib/mysql"]
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 3s
+      timeout: 3s
+      retries: 40
+  redis:
+    image: redis:7.2-alpine
+    command: ["redis-server", "--appendonly", "yes", "--appendfsync", "everysec", "--maxmemory-policy", "noeviction"]
+    ports: ["127.0.0.1:6380:6379"]
+    volumes: ["redis-data:/data"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+  migrate:
+    build: .
+    image: go-dianping:local
+    command: ["/app/migrate", "-seed"]
+    environment:
+      DIANPING_MYSQL_DSN: "dianping:dianping_dev@tcp(mysql:3306)/go_dianping?charset=utf8mb4&parseTime=true&loc=Asia%2FShanghai"
+    depends_on:
+      mysql: {condition: service_healthy}
+  api:
+    build: .
+    image: go-dianping:local
+    environment:
+      DIANPING_MYSQL_DSN: "dianping:dianping_dev@tcp(mysql:3306)/go_dianping?charset=utf8mb4&parseTime=true&loc=Asia%2FShanghai"
+      DIANPING_REDIS_ADDRESS: redis:6379
+    ports: ["127.0.0.1:8081:8081"]
+    volumes: ["uploads:/app/data/uploads"]
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+      redis: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:8081/health/ready"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+  nginx:
+    image: nginx:1.28-alpine
+    ports: ["127.0.0.1:8080:80"]
+    volumes: ["./configs/nginx.conf:/etc/nginx/conf.d/default.conf:ro"]
+    depends_on:
+      api: {condition: service_healthy}
+volumes:
+  mysql-data:
+  redis-data:
+  uploads:
